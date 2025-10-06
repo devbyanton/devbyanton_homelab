@@ -1,0 +1,140 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: plex
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plex-config
+  namespace: plex
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plex-media
+  namespace: plex
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plex
+  namespace: plex
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plex
+  template:
+    metadata:
+      labels:
+        app: plex
+    spec:
+      containers:
+        - name: plex
+          image: lscr.io/linuxserver/plex:latest
+          env:
+            - name: PLEX_CLAIM
+              value: "claim-cDydt1icSMbspDSCBskE"
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: TZ
+              value: "Europe/Zagreb"
+            - name: ADVERTISE_IP
+              value: "http://plex.anton.local/"
+          ports:
+            - containerPort: 32400
+          volumeMounts:
+            - name: plex-config
+              mountPath: /config
+            - name: plex-media
+              mountPath: /media
+      volumes:
+        - name: plex-config
+          persistentVolumeClaim:
+            claimName: plex-config
+        - name: plex-media
+          persistentVolumeClaim:
+            claimName: plex-media
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xteve
+  namespace: plex
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xteve
+  template:
+    metadata:
+      labels:
+        app: xteve
+    spec:
+      containers:
+        - name: xteve
+          image: alturismo/xteve:latest
+          ports:
+            - containerPort: 34400
+          volumeMounts:
+            - name: xteve-config
+              mountPath: /root/.xteve
+      volumes:
+        - name: xteve-config
+          persistentVolumeClaim:
+            claimName: xteve-config
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: xteve-config
+  namespace: plex
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: plex
+  namespace: plex
+spec:
+  selector:
+    app: plex
+  ports:
+    - protocol: TCP
+      port: 32400
+      targetPort: 32400
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xteve
+  namespace: plex
+spec:
+  selector:
+    app: xteve
+  ports:
+    - protocol: TCP
+      port: 34400
+      targetPort: 34400
+  type: ClusterIP
